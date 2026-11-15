@@ -207,6 +207,61 @@ describe('DatePipe', () => {
     });
   });
 
+  describe('Temporal support', () => {
+    const instant = {
+      epochMilliseconds: Date.parse('2024-02-17T12:00:00Z'),
+      [Symbol.toStringTag]: 'Temporal.Instant' as const,
+    };
+    const plainDate = {
+      calendarId: 'iso8601',
+      year: 2024,
+      month: 2,
+      day: 17,
+      withCalendar: () => ({year: 2024, month: 2, day: 17}),
+      [Symbol.toStringTag]: 'Temporal.PlainDate' as const,
+    };
+
+    it('given an Instant, when transformed with a timezone, then the exact time is shown', () => {
+      expect(pipe.transform(instant, 'yyyy-MM-dd HH:mm', '+0500')).toBe('2024-02-17 17:00');
+    });
+
+    it('given an Instant, when a default timezone is configured, then it is applied', () => {
+      const pipe = new DatePipe('en-US', null, {timezone: '+0500'});
+      expect(pipe.transform(instant, 'yyyy-MM-dd HH:mm')).toBe('2024-02-17 17:00');
+    });
+
+    it('given a PlainDate, when transformed, then the default format is used', () => {
+      expect(pipe.transform(plainDate)).toBe('Feb 17, 2024');
+    });
+
+    it('given a PlainDate, when a default timezone is configured, then the date is not shifted', () => {
+      const pipe = new DatePipe('en-US', null, {timezone: '-1200'});
+      expect(pipe.transform(plainDate, 'yyyy-MM-dd')).toBe('2024-02-17');
+    });
+
+    it('given an unsupported Temporal type, when transformed, then a pipe error names it', () => {
+      const plainTime = {[Symbol.toStringTag]: 'Temporal.PlainTime'} as any;
+      expect(() => pipe.transform(plainTime)).toThrowError(
+        /InvalidPipeArgument: .*Temporal\.PlainTime is not supported/,
+      );
+    });
+
+    it('given a PlainDate, when used in a template, then it is rendered', async () => {
+      @Component({
+        imports: [DatePipe],
+        template: `{{ value | date: 'fullDate' }}`,
+      })
+      class TestComponent {
+        value = plainDate;
+      }
+
+      const fixture = TestBed.createComponent(TestComponent);
+      await fixture.whenStable();
+
+      expect(fixture.nativeElement.textContent).toBe('Saturday, February 17, 2024');
+    });
+  });
+
   it('should be available as a standalone pipe', async () => {
     @Component({
       imports: [DatePipe],

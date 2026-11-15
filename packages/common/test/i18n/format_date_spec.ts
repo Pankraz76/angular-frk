@@ -551,5 +551,250 @@ describe('Format date', () => {
       // Jan 01st is a Monday
       expect(getThursdayThisIsoWeek(new Date(2024, 0, 1))).toEqual(new Date(2024, 0, 4));
     });
+
+    describe('Temporal support', () => {
+      describe('given a Temporal.Instant', () => {
+        const value = instant('2024-02-17T12:00:00.789Z');
+
+        it('when converted to a date, then it represents the same exact time', () => {
+          expect(toDate(value)).toEqual(new Date('2024-02-17T12:00:00.789Z'));
+        });
+
+        it('when formatted with a timezone, then the exact time is shown in that timezone', () => {
+          expect(formatDate(value, 'long', 'en', '+0500')).toBe(
+            'February 17, 2024, 5:00:00 PM GMT+5',
+          );
+        });
+
+        it('when formatted without a timezone, then it is shown like the equivalent Date', () => {
+          const format = 'yyyy-MM-dd HH:mm:ss.SSS ZZZZZ';
+          expect(formatDate(value, format, 'en')).toBe(
+            formatDate(new Date(value.epochMilliseconds), format, 'en'),
+          );
+        });
+      });
+
+      describe('given a Temporal.ZonedDateTime', () => {
+        // 2024-02-17T12:00:00.789Z in a time zone that is 9 hours ahead of UTC.
+        const value = zonedDateTime(
+          '2024-02-17T12:00:00.789Z',
+          9 * 60,
+          [2024, 2, 17, 21, 0, 0, 789],
+        );
+
+        it('when converted to a date, then it represents the same exact time', () => {
+          expect(toDate(value)).toEqual(new Date('2024-02-17T12:00:00.789Z'));
+        });
+
+        it('when formatted without a timezone, then its own wall-clock time and offset are shown', () => {
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm:ss.SSS ZZZZZ', 'en')).toBe(
+            '2024-02-17 21:00:00.789 +09:00',
+          );
+          expect(formatDate(value, 'long', 'en')).toBe('February 17, 2024, 9:00:00 PM GMT+9');
+        });
+
+        it('when formatted with a timezone, then the explicit timezone wins', () => {
+          expect(formatDate(value, 'long', 'en', '+0500')).toBe(
+            'February 17, 2024, 5:00:00 PM GMT+5',
+          );
+        });
+
+        it('when its offset is negative with minutes, then the offset is shown correctly', () => {
+          const newfoundland = zonedDateTime(
+            '2024-02-17T12:00:00Z',
+            -(3 * 60 + 30),
+            [2024, 2, 17, 8, 30, 0, 0],
+          );
+          expect(formatDate(newfoundland, 'HH:mm ZZZZZ', 'en')).toBe('08:30 -03:30');
+        });
+      });
+
+      describe('given a Temporal.PlainDateTime', () => {
+        const value = wallClock('Temporal.PlainDateTime', [2024, 2, 17, 21, 5, 9, 789]);
+
+        it('when converted to a date, then the local fields match its wall-clock time', () => {
+          expect(toDate(value)).toEqual(new Date(2024, 1, 17, 21, 5, 9, 789));
+        });
+
+        it('when formatted, then its wall-clock time is shown', () => {
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm:ss.SSS', 'en')).toBe(
+            '2024-02-17 21:05:09.789',
+          );
+        });
+
+        it('when formatted with a timezone, then the wall-clock time is not shifted', () => {
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm', 'en', '+0500')).toBe('2024-02-17 21:05');
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm', 'en', '-1200')).toBe('2024-02-17 21:05');
+        });
+
+        it('when its year is below 100, then the year is not mapped to the 20th century', () => {
+          const early = wallClock('Temporal.PlainDateTime', [54, 2, 18, 10, 30]);
+          expect(formatDate(early, 'yyyy-MM-dd HH:mm', 'en')).toBe('0054-02-18 10:30');
+        });
+      });
+
+      describe('given a Temporal.PlainDate', () => {
+        const value = wallClock('Temporal.PlainDate', [2024, 2, 17]);
+        // A real `Temporal.PlainDate` has no time fields at all.
+        const {hour, minute, second, millisecond, ...plainDate} = value;
+
+        it('when converted to a date, then it is midnight of that day in local time', () => {
+          expect(toDate(plainDate)).toEqual(new Date(2024, 1, 17));
+        });
+
+        it('when formatted, then the date is shown', () => {
+          expect(formatDate(plainDate, 'mediumDate', 'en')).toBe('Feb 17, 2024');
+          expect(formatDate(plainDate, 'EEEE, MMMM d, y', 'de')).toBe('Samstag, Februar 17, 2024');
+        });
+
+        it('when formatted with time fields, then midnight is shown like for a date-only string', () => {
+          expect(formatDate(plainDate, 'yyyy-MM-dd HH:mm:ss', 'en')).toBe(
+            formatDate('2024-02-17', 'yyyy-MM-dd HH:mm:ss', 'en'),
+          );
+        });
+
+        it('when formatted with a timezone, then the date is not shifted', () => {
+          expect(formatDate(plainDate, 'yyyy-MM-dd', 'en', '+1400')).toBe('2024-02-17');
+          expect(formatDate(plainDate, 'yyyy-MM-dd', 'en', '-1200')).toBe('2024-02-17');
+        });
+      });
+
+      describe('given a Temporal value in a non-ISO calendar', () => {
+        it('when formatted, then the fields of the ISO 8601 calendar are shown', () => {
+          // 2024-02-17 is 8 Adar I 5784 in the Hebrew calendar.
+          const hebrew = {year: 5784, month: 6, day: 8};
+          const date = wallClock('Temporal.PlainDate', [2024, 2, 17], 'hebrew', hebrew);
+          const dateTime = wallClock(
+            'Temporal.PlainDateTime',
+            [2024, 2, 17, 21, 5],
+            'hebrew',
+            hebrew,
+          );
+          const zoned = {
+            ...zonedDateTime('2024-02-17T12:05:00Z', 9 * 60, [2024, 2, 17, 21, 5]),
+            ...wallClock('Temporal.ZonedDateTime', [2024, 2, 17, 21, 5], 'hebrew', hebrew),
+          };
+
+          expect(formatDate(date, 'yyyy-MM-dd', 'en')).toBe('2024-02-17');
+          expect(formatDate(dateTime, 'yyyy-MM-dd HH:mm', 'en')).toBe('2024-02-17 21:05');
+          expect(formatDate(zoned, 'yyyy-MM-dd HH:mm', 'en')).toBe('2024-02-17 21:05');
+        });
+      });
+
+      describe('given a Temporal value that is not a date', () => {
+        for (const type of ['PlainTime', 'PlainYearMonth', 'PlainMonthDay', 'Duration']) {
+          it(`when a Temporal.${type} is formatted, then an error names the unsupported type`, () => {
+            const value = {[Symbol.toStringTag]: `Temporal.${type}`} as any;
+            expect(() => formatDate(value, 'mediumDate', 'en')).toThrowError(
+              new RegExp(`NG02311: .*Temporal\\.${type} is not supported`),
+            );
+          });
+        }
+      });
+
+      // These specs only run on runtimes that ship the standardized Temporal API (early drafts
+      // had no `calendarId`). The structural stand-ins above cover the same behavior everywhere.
+      const Temporal = (globalThis as any).Temporal;
+      const hasTemporal = typeof Temporal?.PlainDate.from('2024-02-17').calendarId === 'string';
+      (hasTemporal ? describe : xdescribe)('given values of the native Temporal API', () => {
+        it('when an Instant is formatted, then the exact time is shown', () => {
+          const value = Temporal.Instant.from('2024-02-17T12:00:00.789123456Z');
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm:ss.SSS ZZZZZ', 'en', '+0500')).toBe(
+            '2024-02-17 17:00:00.789 +05:00',
+          );
+        });
+
+        it('when a ZonedDateTime is formatted, then its own wall-clock time and offset are shown', () => {
+          const value = Temporal.ZonedDateTime.from('2024-02-17T21:00:00.789+09:00[Asia/Tokyo]');
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm:ss.SSS ZZZZZ', 'en')).toBe(
+            '2024-02-17 21:00:00.789 +09:00',
+          );
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm ZZZZZ', 'en', 'UTC')).toBe(
+            '2024-02-17 12:00 Z',
+          );
+        });
+
+        it('when a PlainDateTime is formatted, then its wall-clock time is shown', () => {
+          const value = Temporal.PlainDateTime.from('2024-02-17T21:05:09.789');
+          expect(formatDate(value, 'yyyy-MM-dd HH:mm:ss.SSS', 'en', '-1200')).toBe(
+            '2024-02-17 21:05:09.789',
+          );
+        });
+
+        it('when a PlainDate is formatted, then the date is shown', () => {
+          const value = Temporal.PlainDate.from('2024-02-17');
+          expect(formatDate(value, 'fullDate', 'en', '+1400')).toBe('Saturday, February 17, 2024');
+        });
+
+        it('when a value uses a non-ISO calendar, then the ISO 8601 fields are shown', () => {
+          const date = Temporal.PlainDate.from('2024-02-17[u-ca=hebrew]');
+          const zoned = Temporal.ZonedDateTime.from(
+            '2024-02-17T21:05+09:00[Asia/Tokyo][u-ca=hebrew]',
+          );
+          expect(date.year).toBe(5784);
+          expect(formatDate(date, 'yyyy-MM-dd', 'en')).toBe('2024-02-17');
+          expect(formatDate(zoned, 'yyyy-MM-dd HH:mm', 'en')).toBe('2024-02-17 21:05');
+        });
+
+        it('when a value is not a date, then an error names the unsupported type', () => {
+          for (const value of [
+            Temporal.PlainTime.from('21:05'),
+            Temporal.PlainYearMonth.from('2024-02'),
+            Temporal.PlainMonthDay.from('02-17'),
+            Temporal.Duration.from('PT1H'),
+          ]) {
+            expect(() => formatDate(value, 'mediumDate', 'en')).toThrowError(/is not supported/);
+          }
+        });
+      });
+    });
   });
 });
+
+type IsoFields = [
+  year: number,
+  month: number,
+  day: number,
+  hour?: number,
+  minute?: number,
+  second?: number,
+  millisecond?: number,
+];
+
+/**
+ * Structural stand-ins for Temporal objects. They allow these tests to run on runtimes that do
+ * not ship Temporal yet. `calendarFields` are the values reported while the object uses the
+ * non-ISO calendar `calendarId`.
+ */
+function wallClock<T extends string>(
+  tag: T,
+  [year, month, day, hour = 0, minute = 0, second = 0, millisecond = 0]: IsoFields,
+  calendarId = 'iso8601',
+  calendarFields: {year?: number; month?: number; day?: number} = {},
+) {
+  const iso = {year, month, day, hour, minute, second, millisecond};
+  return {
+    ...iso,
+    ...(calendarId === 'iso8601' ? {} : calendarFields),
+    calendarId,
+    withCalendar: (calendar: string) => {
+      if (calendar !== 'iso8601') {
+        throw new Error(`Unexpected calendar "${calendar}"`);
+      }
+      return iso;
+    },
+    [Symbol.toStringTag]: tag,
+  };
+}
+
+function instant(iso: string) {
+  return {epochMilliseconds: Date.parse(iso), [Symbol.toStringTag]: 'Temporal.Instant' as const};
+}
+
+function zonedDateTime(iso: string, offsetMinutes: number, fields: IsoFields) {
+  return {
+    ...wallClock('Temporal.ZonedDateTime', fields),
+    epochMilliseconds: Date.parse(iso),
+    offsetNanoseconds: offsetMinutes * 60e9,
+  };
+}

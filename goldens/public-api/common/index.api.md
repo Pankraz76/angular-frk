@@ -140,11 +140,11 @@ export const DATE_PIPE_DEFAULT_TIMEZONE: InjectionToken<string>;
 export class DatePipe implements PipeTransform {
     constructor(locale: string, defaultTimezone?: string | null | undefined, defaultOptions?: (DatePipeConfig | null) | undefined);
     // (undocumented)
-    transform(value: Date | string | number, format?: string, timezone?: string, locale?: string): string | null;
+    transform(value: Date | string | number | TemporalDateLike, format?: string, timezone?: string, locale?: string): string | null;
     // (undocumented)
     transform(value: null | undefined, format?: string, timezone?: string, locale?: string): null;
     // (undocumented)
-    transform(value: Date | string | number | null | undefined, format?: string, timezone?: string, locale?: string): string | null;
+    transform(value: Date | string | number | TemporalDateLike | null | undefined, format?: string, timezone?: string, locale?: string): string | null;
     // (undocumented)
     static ɵfac: i0.ɵɵFactoryDeclaration<DatePipe, [null, { optional: true; }, { optional: true; }]>;
     // (undocumented)
@@ -180,7 +180,7 @@ export { DOCUMENT }
 export function formatCurrency(value: number, locale: string, currency: string, currencyCode?: string, digitsInfo?: string): string;
 
 // @public
-export function formatDate(value: string | number | Date, format: string, locale: string, timezone?: string): string;
+export function formatDate(value: string | number | Date | TemporalDateLike, format: string, locale: string, timezone?: string): string;
 
 // @public
 export function formatNumber(value: number, locale: string, digitsInfo?: string): string;
@@ -979,6 +979,105 @@ export class SlicePipe implements PipeTransform {
     static ɵfac: i0.ɵɵFactoryDeclaration<SlicePipe, never>;
     // (undocumented)
     static ɵpipe: i0.ɵɵPipeDeclaration<SlicePipe, "slice", true>;
+}
+
+// @public
+export type TemporalDateLike = TemporalInstantLike | TemporalZonedDateTimeLike | TemporalPlainDateTimeLike | TemporalPlainDateLike;
+
+// @public
+export interface TemporalInstantLike {
+    // (undocumented)
+    readonly [Symbol.toStringTag]: 'Temporal.Instant';
+    // (undocumented)
+    readonly epochMilliseconds: number;
+}
+
+// @public
+export interface TemporalPlainDateLike {
+    // (undocumented)
+    readonly [Symbol.toStringTag]: 'Temporal.PlainDate';
+    // (undocumented)
+    readonly calendarId: string;
+    // (undocumented)
+    readonly day: number;
+    // (undocumented)
+    readonly month: number;
+    // (undocumented)
+    withCalendar(calendar: string): {
+        readonly year: number;
+        readonly month: number;
+        readonly day: number;
+    };
+    // (undocumented)
+    readonly year: number;
+}
+
+// @public
+export interface TemporalPlainDateTimeLike {
+    // (undocumented)
+    readonly [Symbol.toStringTag]: 'Temporal.PlainDateTime';
+    // (undocumented)
+    readonly calendarId: string;
+    // (undocumented)
+    readonly day: number;
+    // (undocumented)
+    readonly hour: number;
+    // (undocumented)
+    readonly millisecond: number;
+    // (undocumented)
+    readonly minute: number;
+    // (undocumented)
+    readonly month: number;
+    // (undocumented)
+    readonly second: number;
+    // (undocumented)
+    withCalendar(calendar: string): {
+        readonly year: number;
+        readonly month: number;
+        readonly day: number;
+        readonly hour: number;
+        readonly minute: number;
+        readonly second: number;
+        readonly millisecond: number;
+    };
+    // (undocumented)
+    readonly year: number;
+}
+
+// @public
+export interface TemporalZonedDateTimeLike {
+    // (undocumented)
+    readonly [Symbol.toStringTag]: 'Temporal.ZonedDateTime';
+    // (undocumented)
+    readonly calendarId: string;
+    // (undocumented)
+    readonly day: number;
+    // (undocumented)
+    readonly epochMilliseconds: number;
+    // (undocumented)
+    readonly hour: number;
+    // (undocumented)
+    readonly millisecond: number;
+    // (undocumented)
+    readonly minute: number;
+    // (undocumented)
+    readonly month: number;
+    // (undocumented)
+    readonly offsetNanoseconds: number;
+    // (undocumented)
+    readonly second: number;
+    // (undocumented)
+    withCalendar(calendar: string): {
+        readonly year: number;
+        readonly month: number;
+        readonly day: number;
+        readonly hour: number;
+        readonly minute: number;
+        readonly second: number;
+        readonly millisecond: number;
+    };
+    // (undocumented)
+    readonly year: number;
 }
 
 // @public @deprecated

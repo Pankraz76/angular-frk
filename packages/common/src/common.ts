@@ -14,6 +14,13 @@
 export * from './private_export';
 export * from './location/index';
 export {formatDate} from './i18n/format_date';
+export {
+  TemporalDateLike,
+  TemporalInstantLike,
+  TemporalPlainDateLike,
+  TemporalPlainDateTimeLike,
+  TemporalZonedDateTimeLike,
+} from './i18n/temporal';
 export {formatCurrency, formatNumber, formatPercent} from './i18n/format_number';
 export {NgLocaleLocalization, NgLocalization} from './i18n/localization';
 export {registerLocaleData} from './i18n/locale_data';

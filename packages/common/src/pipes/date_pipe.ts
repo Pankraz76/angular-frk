@@ -9,6 +9,7 @@
 import {Inject, InjectionToken, LOCALE_ID, Optional, Pipe, PipeTransform} from '@angular/core';
 
 import {formatDate} from '../i18n/format_date';
+import {TemporalDateLike} from '../i18n/temporal';
 
 import {DatePipeConfig, DEFAULT_DATE_FORMAT} from './date_pipe_config';
 import {invalidPipeArgumentError} from './utils';
@@ -230,7 +231,8 @@ export class DatePipe implements PipeTransform {
 
   /**
    * @param value The date expression: a `Date` object,  a number
-   * (milliseconds since UTC epoch), or an ISO string (https://www.w3.org/TR/NOTE-datetime).
+   * (milliseconds since UTC epoch), an ISO string (https://www.w3.org/TR/NOTE-datetime), or a
+   * `Temporal.Instant`, `Temporal.ZonedDateTime`, `Temporal.PlainDateTime` or `Temporal.PlainDate`.
    * @param format The date/time components to include, using predefined options or a
    * custom format string.  When not provided, the `DatePipe` looks for the value using the
    * `DATE_PIPE_DEFAULT_OPTIONS` injection token (and reads the `dateFormat` property).
@@ -239,6 +241,9 @@ export class DatePipe implements PipeTransform {
    * looks for the value using the `DATE_PIPE_DEFAULT_OPTIONS` injection token (and reads
    * the `timezone` property). If the token is not configured, the end-user's local system
    * timezone is used as a value.
+   * A `Temporal.ZonedDateTime` is shown in its own time zone unless a timezone is provided or
+   * configured. A `Temporal.PlainDateTime` and a `Temporal.PlainDate` have no time zone and are
+   * always shown as they are.
    * @param locale A locale code for the locale format rules to use.
    * When not supplied, uses the value of `LOCALE_ID`, which is `en-US` by default.
    * See [Setting your app locale](guide/i18n/locale-id).
@@ -248,20 +253,20 @@ export class DatePipe implements PipeTransform {
    * @returns A date string in the desired format.
    */
   transform(
-    value: Date | string | number,
+    value: Date | string | number | TemporalDateLike,
     format?: string,
     timezone?: string,
     locale?: string,
   ): string | null;
   transform(value: null | undefined, format?: string, timezone?: string, locale?: string): null;
   transform(
-    value: Date | string | number | null | undefined,
+    value: Date | string | number | TemporalDateLike | null | undefined,
     format?: string,
     timezone?: string,
     locale?: string,
   ): string | null;
   transform(
-    value: Date | string | number | null | undefined,
+    value: Date | string | number | TemporalDateLike | null | undefined,
     format?: string,
     timezone?: string,
     locale?: string,

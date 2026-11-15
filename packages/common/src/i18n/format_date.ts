@@ -29,6 +29,16 @@ import {
   TranslationWidth,
 } from './locale_data_api';
 import {RuntimeErrorCode} from '../errors';
+import {
+  getIsoWallClock,
+  getTemporalTag,
+  getTemporalTimezoneOffset,
+  isTemporalPlainValue,
+  isTemporalZonedDateTime,
+  TemporalDateLike,
+  TemporalInstantLike,
+  TemporalWallClockLike,
+} from './temporal';
 
 export const ISO8601_DATE_REGEX =
   /^(\d{4,})-?(\d\d)-?(\d\d)(?:T(\d\d)(?::?(\d\d)(?::?(\d\d)(?:\.(\d+))?)?)?(Z|([+-])(\d\d):?(\d\d))?)?$/;
@@ -71,11 +81,14 @@ const enum TranslationType {
  * Formats a date according to locale rules.
  *
  * @param value The date to format, as a Date, or a number (milliseconds since UTC epoch)
- * or an [ISO date-time string](https://www.w3.org/TR/NOTE-datetime).
+ * or an [ISO date-time string](https://www.w3.org/TR/NOTE-datetime), or a `Temporal.Instant`,
+ * `Temporal.ZonedDateTime`, `Temporal.PlainDateTime` or `Temporal.PlainDate`.
  * @param format The date-time components to include. See `DatePipe` for details.
  * @param locale A locale code for the locale format rules to use.
  * @param timezone The time zone. A time zone offset from GMT (such as `'+0430'`).
- * If not specified, uses host system settings.
+ * If not specified, uses host system settings, or the time zone of the value if it is a
+ * `Temporal.ZonedDateTime`. Ignored for a `Temporal.PlainDateTime` and a `Temporal.PlainDate`,
+ * which have no time zone and are always shown as they are.
  *
  * @returns The formatted date string.
  *
@@ -85,7 +98,7 @@ const enum TranslationType {
  * @publicApi
  */
 export function formatDate(
-  value: string | number | Date,
+  value: string | number | Date | TemporalDateLike,
   format: string,
   locale: string,
   timezone?: string,
@@ -117,9 +130,16 @@ export function formatDate(
   }
 
   let dateTimezoneOffset = date.getTimezoneOffset();
-  if (timezone) {
+  if (isTemporalPlainValue(value)) {
+    // A plain date or date-time has no time zone: it describes the same wall-clock time
+    // everywhere, so there is nothing to convert.
+  } else if (timezone) {
     dateTimezoneOffset = timezoneToOffset(timezone, dateTimezoneOffset);
     date = convertTimezoneToLocal(date, timezone, true);
+  } else if (isTemporalZonedDateTime(value)) {
+    // A zoned date-time is shown in its own time zone unless another one is requested.
+    dateTimezoneOffset = getTemporalTimezoneOffset(value);
+    date = wallClockToDate(value);
   }
 
   let text = '';
@@ -914,6 +934,9 @@ function convertTimezoneToLocal(date: Date, timezone: string, reverse: boolean):
  *
  * Supported input formats:
  * - `Date`
+ * - `Temporal.Instant` and `Temporal.ZonedDateTime`: the same exact time
+ * - `Temporal.PlainDateTime` and `Temporal.PlainDate`: the same wall-clock time in the local
+ *   time zone, a plain date being midnight of that day
  * - number: timestamp
  * - string: numeric (e.g. "1234"), ISO and date strings in a format supported by
  *   [Date.parse()](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Date/parse).
@@ -921,9 +944,29 @@ function convertTimezoneToLocal(date: Date, timezone: string, reverse: boolean):
  *
  * Throws if unable to convert to a date.
  */
-export function toDate(value: string | number | Date): Date {
+export function toDate(value: string | number | Date | TemporalDateLike): Date {
   if (isDate(value)) {
     return value;
+  }
+
+  const temporalTag = getTemporalTag(value);
+  switch (temporalTag) {
+    case null:
+      break;
+    case 'Temporal.Instant':
+    case 'Temporal.ZonedDateTime':
+      return new Date((value as TemporalInstantLike).epochMilliseconds);
+    case 'Temporal.PlainDateTime':
+    case 'Temporal.PlainDate':
+      return wallClockToDate(value as TemporalWallClockLike);
+    default:
+      throw new RuntimeError(
+        RuntimeErrorCode.INVALID_TO_DATE_CONVERSION,
+        ngDevMode &&
+          `Unable to convert a ${temporalTag} into a date: ${temporalTag} is not supported. ` +
+            `Use a Temporal.Instant, Temporal.ZonedDateTime, Temporal.PlainDateTime or ` +
+            `Temporal.PlainDate instead.`,
+      );
   }
 
   if (typeof value === 'number' && !isNaN(value)) {
@@ -965,6 +1008,24 @@ export function toDate(value: string | number | Date): Date {
       ngDevMode && `Unable to convert "${value}" into a date`,
     );
   }
+  return date;
+}
+
+/**
+ * Creates a date whose local date and time fields match the wall-clock fields of a Temporal value.
+ */
+function wallClockToDate(value: TemporalWallClockLike): Date {
+  const {
+    year,
+    month,
+    day,
+    hour = 0,
+    minute = 0,
+    second = 0,
+    millisecond = 0,
+  } = getIsoWallClock(value);
+  const date = createDate(year, month - 1, day);
+  date.setHours(hour, minute, second, millisecond);
   return date;
 }
 
